@@ -155,6 +155,7 @@ int http_fn_index(http_request_t* request) {
 	int iValue;
 	bool bForceShowRGB;
 	const char* inputName;
+	int channelType;
 
 	bRawPWMs = CFG_HasFlag(OBK_FLAG_LED_RAWCHANNELSMODE);
 	bForceShowRGBCW = CFG_HasFlag(OBK_FLAG_LED_FORCESHOWRGBCWCONTROLLER);
@@ -271,7 +272,6 @@ int http_fn_index(http_request_t* request) {
 
 	poststr(request, "<table>");	//Table default to 100% width in stylesheet
 	for (i = 0; i < CHANNEL_MAX; i++) {
-		int channelType;
 
 		channelType = CHANNEL_GetType(i);
 		// check ability to hide given channel from gui
@@ -294,7 +294,45 @@ int http_fn_index(http_request_t* request) {
 		}
 	}
 	poststr(request, "</table>");
+	poststr(request, "<table>");	//Table default to 100% width in stylesheet
+	for (i = 0; i < CHANNEL_MAX; i++) {
 
+
+		// check ability to hide given channel from gui
+		if (BIT_CHECK(g_hiddenChannels, i)) {
+			continue; // hidden
+		}
+
+		channelType = CHANNEL_GetType(i);
+		if (h_isChannelRelay(i) || channelType == ChType_Toggle) {
+			const char* c;
+			const char *prefix;
+			if (i <= 1) {
+				hprintf255(request, "<tr>");
+			}
+			if (CHANNEL_Check(i)) {
+				c = "bgrn";
+			}
+			else {
+				c = "bred";
+			}
+			poststr(request, "<td><form action=\"index\">");
+			hprintf255(request, "<input type=\"hidden\" name=\"tgl\" value=\"%i\">", i);
+
+			if (CHANNEL_ShouldAddTogglePrefixToUI(i)) {
+				prefix = "Toggle ";
+			}
+			else {
+				prefix = "";
+			}
+
+			hprintf255(request, "<input class=\"%s\" type=\"submit\" value=\"%s%s\"/></form></td>", c, prefix, CHANNEL_GetLabel(i));
+			if (i == CHANNEL_MAX - 1) {
+				poststr(request, "</tr>");
+			}
+		}
+	}
+	poststr(request, "</table>");
 	poststr(request, "<table>");	//Table default to 100% width in stylesheet
 	for (i = 0; i < PLATFORM_GPIO_MAX; i++) {
 		int role;
@@ -318,7 +356,6 @@ int http_fn_index(http_request_t* request) {
 	}
 	for (i = 0; i < CHANNEL_MAX; i++) {
 
-		int channelType;
 
 		// check ability to hide given channel from gui
 		if (BIT_CHECK(g_hiddenChannels, i)) {
@@ -570,31 +607,7 @@ int http_fn_index(http_request_t* request) {
 			poststr(request, "</td></tr>");
 		}
 		else if (h_isChannelRelay(i) || channelType == ChType_Toggle) {
-			const char* c;
-			const char *prefix;
-			if (i <= 1) {
-				hprintf255(request, "<tr>");
-			}
-			if (CHANNEL_Check(i)) {
-				c = "bgrn";
-			}
-			else {
-				c = "bred";
-			}
-			poststr(request, "<td><form action=\"index\">");
-			hprintf255(request, "<input type=\"hidden\" name=\"tgl\" value=\"%i\">", i);
-
-			if (CHANNEL_ShouldAddTogglePrefixToUI(i)) {
-				prefix = "Toggle ";
-			}
-			else {
-				prefix = "";
-			}
-
-			hprintf255(request, "<input class=\"%s\" type=\"submit\" value=\"%s%s\"/></form></td>", c, prefix, CHANNEL_GetLabel(i));
-			if (i == CHANNEL_MAX - 1) {
-				poststr(request, "</tr>");
-			}
+			// HANDLED ABOVE in previous loop
 		}
 		else if ((bRawPWMs && h_isChannelPWM(i)) || (channelType == ChType_Dimmer) || (channelType == ChType_Dimmer256) || (channelType == ChType_Dimmer1000)) {
 			int maxValue;
@@ -797,7 +810,7 @@ int http_fn_index(http_request_t* request) {
 		hprintf255(request, "</h5>");
 	}
 	hprintf255(request, "<h5>Cfg size: %i, change counter: %i, ota counter: %i, boot incompletes %i (might change to 0 if you wait to 30 sec)!</h5>",
-		sizeof(g_cfg), g_cfg.changeCounter, g_cfg.otaCounter, Main_GetLastRebootBootFailures());
+		sizeof(g_cfg), g_cfg.changeCounter, g_cfg.otaCounter, g_bootFailures);
 
 	inputName = CFG_GetPingHost();
 	if (inputName && *inputName && CFG_GetPingDisconnectedSecondsToRestart()) {
@@ -880,7 +893,7 @@ int http_fn_index(http_request_t* request) {
 #endif
 	if (bSafeMode) {
 		hprintf255(request, "<h5 class='safe'>You are in safe mode (AP mode) because full reboot failed %i times. ",
-			Main_GetLastRebootBootFailures());
+			g_bootFailures);
 		hprintf255(request, "Pins, relays, etc are disabled.</h5>");
 
 	}
@@ -940,6 +953,53 @@ int http_fn_cfg_mqtt(http_request_t* request) {
 	add_label_password_field(request, "Password", "password", CFG_GetMQTTPass(), "<br>");
 
 	poststr(request, "<br><input type=\"submit\" value=\"Submit\" onclick=\"return confirm('Are you sure? Please check MQTT data twice?')\"></form> ");
+	poststr(request, htmlFooterReturnToCfgLink);
+	http_html_end(request);
+	poststr(request, NULL);
+	return 0;
+}
+
+int http_fn_cfg_ip(http_request_t* request) {
+	char tmp[64];
+	int g_changes = 0;
+	byte ip[4];
+	http_setup(request, httpMimeTypeHTML);
+	http_html_start(request, "IP");
+	poststr_h2(request, "Here you can set static IP or DHCP");
+	hprintf255(request, "<h4>This setting applies only to WiFi client mode.</h4>");
+	hprintf255(request, "<h4>You must restart manually for changes to take place.</h4>");
+	hprintf255(request, "<h4>Currently, DHCP is enabled by default and works when you set IP to 0.0.0.0.</h4>");
+
+	if (http_getArg(request->url, "IP", tmp, sizeof(tmp))) {
+		str_to_ip(tmp, g_cfg.staticIP.localIPAddr);
+		g_changes++;
+	}
+	if (http_getArg(request->url, "mask", tmp, sizeof(tmp))) {
+		str_to_ip(tmp, g_cfg.staticIP.netMask);
+		g_changes++;
+	}
+	if (http_getArg(request->url, "dns", tmp, sizeof(tmp))) {
+		str_to_ip(tmp, g_cfg.staticIP.dnsServerIpAddr);
+		g_changes++;
+	}
+	if (http_getArg(request->url, "gate", tmp, sizeof(tmp))) {
+		str_to_ip(tmp, g_cfg.staticIP.gatewayIPAddr);
+		g_changes++;
+	}
+	if (g_changes) {
+		CFG_MarkAsDirty();
+		hprintf255(request, "<h4>Saved.</h4>");
+	}
+	convert_IP_to_string(tmp, g_cfg.staticIP.localIPAddr);
+	add_label_text_field(request, "IP", "IP", tmp, "<form action=\"/cfg_ip\">");
+	convert_IP_to_string(tmp, g_cfg.staticIP.netMask);
+	add_label_text_field(request, "Mask", "mask", tmp, "<br><br>");
+	convert_IP_to_string(tmp, g_cfg.staticIP.dnsServerIpAddr);
+	add_label_text_field(request, "DNS", "dns", tmp, "<br>");
+	convert_IP_to_string(tmp, g_cfg.staticIP.gatewayIPAddr);
+	add_label_text_field(request, "Gate", "gate", tmp, "<br>");
+
+	poststr(request, "<br><input type=\"submit\" value=\"Submit\" onclick=\"return confirm('Are you sure? Remember that you need to reboot manually to apply changes')\"></form> ");
 	poststr(request, htmlFooterReturnToCfgLink);
 	http_html_end(request);
 	poststr(request, NULL);
@@ -1654,6 +1714,17 @@ void doHomeAssistantDiscovery(const char* topic, http_request_t* request) {
 
 			discoveryQueued = true;
 		}
+		else if (IS_PIN_AIR_SENSOR_ROLE(g_cfg.pins.roles[i])) {
+			dev_info = hass_init_sensor_device_info(CO2_SENSOR, PIN_GetPinChannelForPinIndex(i));
+			MQTT_QueuePublish(topic, dev_info->channel, hass_build_discovery_json(dev_info), OBK_PUBLISH_FLAG_RETAIN);
+			hass_free_device_info(dev_info);
+
+			dev_info = hass_init_sensor_device_info(TVOC_SENSOR, PIN_GetPinChannel2ForPinIndex(i));
+			MQTT_QueuePublish(topic, dev_info->channel, hass_build_discovery_json(dev_info), OBK_PUBLISH_FLAG_RETAIN);
+			hass_free_device_info(dev_info);
+
+			discoveryQueued = true;
+		}
 	}
 
 	if (discoveryQueued) {
@@ -1939,6 +2010,7 @@ int http_fn_cfg(http_request_t* request) {
 	postFormAction(request, "cfg_startup", "Configure Startup");
 	postFormAction(request, "cfg_dgr", "Configure Device Groups");
 	postFormAction(request, "cfg_wifi", "Configure WiFi");
+	postFormAction(request, "cfg_ip", "Configure IP");
 	postFormAction(request, "cfg_mqtt", "Configure MQTT");
 	postFormAction(request, "cfg_name", "Configure Names");
 	postFormAction(request, "cfg_mac", "Change MAC");
@@ -2096,7 +2168,7 @@ int http_fn_cfg_pins(http_request_t* request) {
 		poststr(request, "</select>");
 		// Primary linked channel
 		// Some roles do not need any channels
-		if ((si != IOR_SHT3X_CLK && si != IOR_CHT8305_CLK && si != IOR_Button_ToggleAll && si != IOR_Button_ToggleAll_n
+		if ((si != IOR_SGP_CLK && si != IOR_SHT3X_CLK && si != IOR_CHT8305_CLK && si != IOR_Button_ToggleAll && si != IOR_Button_ToggleAll_n
 			&& si != IOR_BL0937_CF && si != IOR_BL0937_CF1 && si != IOR_BL0937_SEL
 			&& si != IOR_LED_WIFI && si != IOR_LED_WIFI_n && si != IOR_LED_WIFI_n
 			&& !(si >= IOR_IRRecv && si <= IOR_DHT11)
@@ -2107,7 +2179,7 @@ int http_fn_cfg_pins(http_request_t* request) {
 		}
 		// Secondary linked channel
 		// For button, is relay index to toggle on double click
-		if (si == IOR_Button || si == IOR_Button_n || IS_PIN_DHT_ROLE(si) || IS_PIN_TEMP_HUM_SENSOR_ROLE(si))
+		if (si == IOR_Button || si == IOR_Button_n || IS_PIN_DHT_ROLE(si) || IS_PIN_TEMP_HUM_SENSOR_ROLE(si) || IS_PIN_AIR_SENSOR_ROLE(si))
 		{
 			hprintf255(request, "<input class=\"hele\" name=\"e%i\" type=\"text\" value=\"%i\"/>", i, ch2);
 		}
@@ -2160,16 +2232,17 @@ const char* g_obk_flagNames[] = {
 	"[LED] Use old linear brightness mode, ignore gamma ramp",
 	"[MQTT] Apply channel type multiplier on (if any) on channel value before publishing it",
 	"[MQTT] In HA discovery, add relays as lights",
-	"[HASS] Deactivate avty_t flag for sensor when publishing to HASS (permit to keep value)",
+	"[HASS] Deactivate avty_t flag for sensor when publishing to HASS (permit to keep value). You must restart HASS discovery for change to take effect.",
 	"[DRV] Deactivate Autostart of all drivers",
 	"[WiFi] Quick connect to WiFi on reboot (TODO: check if it works for you and report on github)",
+	"[Power] Set power and current to zero if all relays are open",
+	"[MQTT] [Debug] Publish all channels (don't enable it, it will be publish all 64 possible channels on connect)",
 	"error",
 	"error",
 	"error",
 	"error",
 	"error",
-	"error",
-};
+}; 
 int http_fn_cfg_generic(http_request_t* request) {
 	int i;
 	char tmpA[64];

@@ -1,7 +1,7 @@
 #ifndef __NEW_PINS_H__
 #define __NEW_PINS_H__
 #include "new_common.h"
-
+#include "hal/hal_wifi.h"
 
 typedef enum ioRole_e {
 	//iodetail:{"name":"None",
@@ -123,13 +123,13 @@ typedef enum ioRole_e {
 	//iodetail:"file":"new_pins.h",
 	//iodetail:"driver":""}
 	IOR_DigitalInput_NoPup_n,
-// energy sensor
-	//iodetail:{"name":"BL0937_SEL",
-	//iodetail:"title":"TODO",
-	//iodetail:"descr":"SEL pin for BL0937 energy measuring devices. Set all BL0937 pins to autostart BL0937 driver. Don't forget to calibrate it later.",
-	//iodetail:"enum":"IOR_BL0937_SEL",
-	//iodetail:"file":"new_pins.h",
-	//iodetail:"driver":""}
+	// energy sensor
+		//iodetail:{"name":"BL0937_SEL",
+		//iodetail:"title":"TODO",
+		//iodetail:"descr":"SEL pin for BL0937 energy measuring devices. Set all BL0937 pins to autostart BL0937 driver. Don't forget to calibrate it later.",
+		//iodetail:"enum":"IOR_BL0937_SEL",
+		//iodetail:"file":"new_pins.h",
+		//iodetail:"driver":""}
 	IOR_BL0937_SEL,
 	//iodetail:{"name":"BL0937_CF",
 	//iodetail:"title":"TODO",
@@ -460,6 +460,34 @@ typedef enum ioRole_e {
 	//iodetail:"file":"new_pins.h",
 	//iodetail:"driver":""}
 	IOR_BL0937_SEL_n,
+	//iodetail:{"name":"DoorSensorWithDeepSleep_pd",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"As DoorSensorWithDeepSleep, but with pulldown resistor",
+	//iodetail:"enum":"IOR_DoorSensorWithDeepSleep_pd",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_DoorSensorWithDeepSleep_pd,
+	//iodetail:{"name":"SGP_CLK",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"SGP Quality Sensor Clock line. will autostart related driver",
+	//iodetail:"enum":"IOR_SGP_CLK",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_SGP_CLK,
+	//iodetail:{"name":"SGP_DAT",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"SGP Quality Sensor Data line. will autostart related driver",
+	//iodetail:"enum":"IOR_SGP_DAT",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_SGP_DAT,
+	//iodetail:{"name":"ADC_Button",
+	//iodetail:"title":"TODO",
+	//iodetail:"descr":"Single ADC with multiple buttons connected.d",
+	//iodetail:"enum":"ADC_Button",
+	//iodetail:"file":"new_pins.h",
+	//iodetail:"driver":""}
+	IOR_ADC_Button,
 	//iodetail:{"name":"Total_Options",
 	//iodetail:"title":"TODO",
 	//iodetail:"descr":"Current total number of available IOR roles",
@@ -471,6 +499,7 @@ typedef enum ioRole_e {
 
 #define IS_PIN_DHT_ROLE(role) (((role)>=IOR_DHT11) && ((role)<=IOR_DHT22))
 #define IS_PIN_TEMP_HUM_SENSOR_ROLE(role) (((role)==IOR_SHT3X_DAT) || ((role)==IOR_CHT8305_DAT))
+#define IS_PIN_AIR_SENSOR_ROLE(role) (((role)==IOR_SGP_DAT))
 
 typedef enum channelType_e {
 	//chandetail:{"name":"Default",
@@ -831,8 +860,10 @@ typedef struct pinsState_s {
 #define OBK_FLAG_NOT_PUBLISH_AVAILABILITY_SENSOR    35
 #define OBK_FLAG_DRV_DISABLE_AUTOSTART              36
 #define OBK_FLAG_WIFI_FAST_CONNECT		            37
+#define OBK_FLAG_POWER_FORCE_ZERO_IF_RELAYS_OPEN    38
+#define OBK_FLAG_MQTT_PUBLISH_ALL_CHANNELS			39
 
-#define OBK_TOTAL_FLAGS 38
+#define OBK_TOTAL_FLAGS 40
 
 #define LOGGER_FLAG_MQTT_DEDUPER					1
 #define LOGGER_FLAG_POWER_SAVE						2
@@ -898,6 +929,7 @@ typedef struct ledRemap_s {
 } ledRemap_t;
 
 #define MAGIC_LED_REMAP_SIZE 5
+
 
 //
 // Main config structure (less than 2KB)
@@ -966,10 +998,11 @@ typedef struct mainConfig_s {
 	unsigned long LFS_Size; // szie of LFS volume.  it's aligned against the end of OTA
 	int loggerFlags;
 #if PLATFORM_W800
-	byte unusedSectorAB[67];
+	byte unusedSectorAB[51];
 #else    
-	byte unusedSectorAB[115];
+	byte unusedSectorAB[99];
 #endif    
+	obkStaticIP_t staticIP;
 	ledRemap_t ledRemap;
 	led_corr_t led_corr;
 	// alternate topic name for receiving MQTT commands
@@ -990,6 +1023,8 @@ typedef struct mainConfig_s {
 extern mainConfig_t g_cfg;
 
 extern char g_enable_pins;
+extern int g_initialPinStates;
+extern byte g_defaultDoorWakeEdge;
 
 #define CHANNEL_SET_FLAG_FORCE		1
 #define CHANNEL_SET_FLAG_SKIP_MQTT	2
@@ -1027,7 +1062,7 @@ int CHANNEL_Get(int ch);
 float CHANNEL_GetFinalValue(int channel);
 float CHANNEL_GetFloat(int ch);
 int CHANNEL_GetRoleForOutputChannel(int ch);
-bool CHANNEL_HasRoleThatShouldBePublished(int ch);
+bool CHANNEL_ShouldBePublished(int ch);
 bool CHANNEL_IsPowerRelayChannel(int ch);
 // See: enum channelType_t
 void CHANNEL_SetType(int ch, int type);

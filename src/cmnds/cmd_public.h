@@ -114,10 +114,17 @@ enum EventCode {
 
 	CMD_EVENT_LED_MODE, // Argument: new light mode as integer
 
+	CMD_EVENT_CHANGE_NOMQTTTIME,
+
+	CMD_EVENT_ADC_BUTTON,
+
+	CMD_EVENT_NTP_STATE,
+
 	// must be lower than 256
 	CMD_EVENT_MAX_TYPES
 };
 
+int EVENT_ParseEventName(const char *s);
 
 // the slider control in the UI emits values
 //in the range from 154-500 (defined

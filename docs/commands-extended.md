@@ -6,6 +6,7 @@ Do not add anything here, as it will overwritten with next rebuild.
 | Command        | Arguments          | Description  | Location |
 |:------------- |:-------------:|:----- | ------:|
 | SetChannel | [ChannelIndex][ChannelValue] | Sets a raw channel to given value. Relay channels are using 1 and 0 values. PWM channels are within [0,100] range. Do not use this for LED control, because there is a better and more advanced LED driver with dimming and configuration memory (remembers setting after on/off), LED driver commands has 'led_' prefix. | File: cmnds/cmd_channels.c<br/>Function: CMD_SetChannel |
+| SetChannelFloat | [ChannelIndex][ChannelValue] | Sets a raw channel to given float value. Currently only used for LED PWM channels. | File: cmnds/cmd_channels.c<br/>Function: CMD_SetChannelFloat |
 | ToggleChannel | [ChannelIndex] | Toggles given channel value. Non-zero becomes zero, zero becomes 1. | File: cmnds/cmd_channels.c<br/>Function: CMD_ToggleChannel |
 | AddChannel | [ChannelIndex][ValueToAdd][ClampMin][ClampMax][bWrapInsteadOfClamp] | Adds a given value to the channel. Can be used to change PWM brightness. Clamp min and max arguments are optional. | File: cmnds/cmd_channels.c<br/>Function: CMD_AddChannel |
 | ClampChannel | [ChannelIndex][Min][Max] | Clamps given channel value to a range. | File: cmnds/cmd_channels.c<br/>Function: CMD_ClampChannel |
@@ -22,6 +23,7 @@ Do not add anything here, as it will overwritten with next rebuild.
 | MapRanges | [TargetChannel][InputValue][RangeVal0][RangeVal1][RangeValN] | This will set given channel to an index showing where given input value is within given range sections. For example, MapRanges 10 0.5 0.3 0.6 0.9 will set channel 10 to 1 because 0.5 value is between 0.3 and 0.6 | File: cmnds/cmd_channels.c<br/>Function: CMD_MapRanges |
 | Map | [TargetChannel][InputValue][InMin][InMax][OutMin][OutMax] | qqq | File: cmnds/cmd_channels.c<br/>Function: CMD_Map |
 | SetChannelVisible | [ChannelIndex][bVisible] | This allows you to force-hide a certain channel from HTTP gui. The channel will still work, but will not show up as a button, or a toggle, etc... | File: cmnds/cmd_channels.c<br/>Function: CMD_SetChannelVisible |
+| Ch | [InputValue] | An alternate command to access channels. It returns all used channels in JSON format. The syntax is ChINDEX value, there is no space between Ch and channel index. It can be sent without value to poll channel values. | File: cmnds/cmd_channels.c<br/>Function: CMD_Ch |
 | AddEventHandler | [EventName][EventArgument][CommandToRun] | This can be used to trigger an action on a button click, long press, etc | File: cmnds/cmd_eventHandlers.c<br/>Function: CMD_AddEventHandler |
 | AddChangeHandler | [Variable][Relation][Constant][Command] | This can listen to change in channel value (for example channel 0 becoming 100), or for a voltage/current/power change for BL0942/BL0937. This supports multiple relations, like ==, !=, >=, < etc. The Variable name for channel is Channel0, Channel2, etc, for BL0XXX it can be 'Power', or 'Current' or 'Voltage' | File: cmnds/cmd_eventHandlers.c<br/>Function: CMD_AddChangeHandler |
 | listEventHandlers |  | Prints full list of added event handlers | File: cmnds/cmd_eventHandlers.c<br/>Function: CMD_ListEventHandlers |
@@ -46,6 +48,8 @@ Do not add anything here, as it will overwritten with next rebuild.
 | SetStartValue | [Channel][Value] | Sets the startup value for a channel. Used for start values for relays. Use 1 for High, 0 for low and -1 for 'remember last state' | File: cmnds/cmd_main.c<br/>Function: CMD_SetStartValue |
 | OpenAP |  | Temporarily disconnects from programmed WiFi network and opens Access Point | File: cmnds/cmd_main.c<br/>Function: CMD_OpenAP |
 | SafeMode |  | Forces device reboot into safe mode (open ap with disabled drivers) | File: cmnds/cmd_main.c<br/>Function: CMD_SafeMode |
+| PingInterval | [IntegerSeconds] | Sets the interval between ping attempts for ping watchdog mechanism | File: cmnds/cmd_main.c<br/>Function: CMD_PingInterval |
+| PingHost | [IPStr] | Sets the host to ping by IP watchdog | File: cmnds/cmd_main.c<br/>Function: CMD_PingHost |
 | led_dimmer | [Value] | set output dimmer 0..100 | File: cmnds/cmd_newLEDDriver.c<br/>Function: dimmer |
 | Dimmer | [Value] | Alias for led_dimmer | File: cmnds/cmd_newLEDDriver.c<br/>Function: dimmer |
 | add_dimmer | [Value][AddMode] | Adds a given value to current LED dimmer. AddMode 0 just adds a value (with a clamp to [0,100]), AddMode 1 will wrap around values (going under 0 goes to 100, going over 100 goes to 0), AddMode 2 will ping-pong value (going to 100 starts going back from 100 to 0, and again, going to 0 starts going up). | File: cmnds/cmd_newLEDDriver.c<br/>Function: add_dimmer |
@@ -82,6 +86,7 @@ Do not add anything here, as it will overwritten with next rebuild.
 | delay_ms | [ValueMS] | Script-only command. Pauses current script thread for given amount of ms. | File: cmnds/cmd_script.c<br/>Function: CMD_Delay_ms |
 | return |  | Script-only command. Currently it just stops totally current script thread. | File: cmnds/cmd_script.c<br/>Function: CMD_Return |
 | resetSVM |  | Resets all SVM and clears all scripts. | File: cmnds/cmd_script.c<br/>Function: CMD_resetSVM |
+| waitFor | [EventName] [Argument] | Wait forever for event. Can be used within script. For example, you can do: waitFor MQTTState 1 or waitFor NTPState 1. You can also do waitFor NoPingTime 600 to wait for 600 seconds without ping watchdog getting successful reply | File: cmnds/cmd_script.c<br/>Function: CMD_waitFor |
 | sendGet | [TargetURL] | Sends a HTTP GET request to target URL. May include GET arguments. Can be used to control devices by Tasmota HTTP protocol. Command supports argument expansion, so $CH11 changes to value of channel 11, etc, etc. | File: cmnds/cmd_send.c<br/>Function: CMD_SendGET |
 | power | [OnorOfforToggle] | Tasmota-style POWER command. Should work for both LEDs and relay-based devices. You can write POWER0, POWER1, etc to access specific relays. | File: cmnds/cmd_tasmota.c<br/>Function: power |
 | powerAll |  | set all outputs | File: cmnds/cmd_tasmota.c<br/>Function: powerAll |
@@ -104,7 +109,8 @@ Do not add anything here, as it will overwritten with next rebuild.
 | lfs_test1 | [FileName] | Tests the LFS file reading feature. | File: cmnds/cmd_tasmota.c<br/>Function: cmnd_lfs_test1 |
 | lfs_test2 | [FileName] | Tests the LFS file reading feature. | File: cmnds/cmd_tasmota.c<br/>Function: cmnd_lfs_test2 |
 | lfs_test3 | [FileName] | Tests the LFS file reading feature. | File: cmnds/cmd_tasmota.c<br/>Function: cmnd_lfs_test3 |
-| Battery_Setup | [int][int][float][int][int] | measure battery based on ADC args minbatt and maxbatt in mv. optional V_divider(2), Vref(default 2400) and ADC bits(4096) and   <br/>e.g.:Battery_Setup 1500 3000 2 2400 4096 | File: drv/drv_battery.c<br/>Function: Battery_Setup |
+| AB_Map | [int] | Sets margines for ADC button codes. For given N margins, there are N+1 possible ADC button values (one should be reserved for 'no button') | File: drv/drv_adcButton.c<br/>Function: Cmd_ADCButtonMap |
+| Battery_Setup | [float][float][float][float][float] | measure battery based on ADC args minbatt and maxbatt in mv. optional V_divider(2), Vref(default 2400) and ADC bits(4096) and   <br/>e.g.:Battery_Setup 1500 3000 2 2400 4096 | File: drv/drv_battery.c<br/>Function: Battery_Setup |
 | Battery_cycle | [int] | change cycle of measurement by default every 10 seconds<br/>e.g.:Battery_Setup 60 | File: drv/drv_battery.c<br/>Function: Battery_cycle |
 | PowerMax | BL0937_PowerMax |  | File: driver/drv_bl0937.c<br/>Function: NULL); |
 | EnergyCntReset |  | Resets the total Energy Counter, the one that is usually kept after device reboots. After this commands, the counter will start again from 0. | File: driver/drv_bl_shared.c<br/>Function: BL09XX_ResetEnergyCounter |
@@ -119,6 +125,9 @@ Do not add anything here, as it will overwritten with next rebuild.
 | BP5758D_Map | [Ch0][Ch1][Ch2][Ch3][Ch4] | Maps the RGBCW values to given indices of BP5758D channels. This is because BP5758D channels order is not the same for some devices. Some devices are using RGBCW order and some are using GBRCW, etc, etc. Example usage: BP5758D_Map 0 1 2 3 4 | File: driver/drv_bp5758d.c<br/>Function: BP5758D_Map |
 | BP5758D_Current | [MaxCurrent] | Sets the maximum current limit for BP5758D driver | File: driver/drv_bp5758d.c<br/>Function: BP5758D_Current |
 | BridgePulseLength | [FloatValue] | Setup value for bridge pulse len | File: driver/drv_bridge_driver.c<br/>Function: Bridge_Pulse_length |
+| CHT_Calibrate |  | Calibrate the CHT Sensor as Tolerance is +/-2 degrees C.<br/>e.g.:SHT_Calibrate -4 10 | File: driver/drv_cht8305.c<br/>Function: CHT_Calibrate |
+| DSEdge | [edgeCode] | DoorSensor driver configuration command. 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising. Default is 2 | File: drv/drv_doorSensorWithDeepSleep.c<br/>Function: DoorDeepSleep_SetEdge |
+| DSTime | [timeSeconds] | DoorSensor driver configuration command. Time to keep device running before next sleep after last door sensor change. In future we may add also an option to automatically sleep after MQTT confirms door state receival | File: drv/drv_doorSensorWithDeepSleep.c<br/>Function: DoorDeepSleep_SetTime |
 | setButtonColor | [ButtonIndex][Color] | Sets the colour of custom scriptable HTTP page button | File: driver/drv_httpButtons.c<br/>Function: CMD_setButtonColor |
 | setButtonCommand | [ButtonIndex][Command] | Sets the command of custom scriptable HTTP page button | File: driver/drv_httpButtons.c<br/>Function: CMD_setButtonCommand |
 | setButtonLabel | [ButtonIndex][Label] | Sets the label of custom scriptable HTTP page button | File: driver/drv_httpButtons.c<br/>Function: CMD_setButtonLabel |
@@ -144,9 +153,10 @@ Do not add anything here, as it will overwritten with next rebuild.
 | VoltageSet | Voltage | Measure the real voltage with an external, reliable power meter and enter this voltage via this command to calibrate. The calibration is automatically saved in the flash memory. | File: driver/drv_pwrCal.c<br/>Function: NULL); |
 | CurrentSet | Current | Measure the real Current with an external, reliable power meter and enter this Current via this command to calibrate. The calibration is automatically saved in the flash memory. | File: driver/drv_pwrCal.c<br/>Function: NULL); |
 | PowerSet | Power | Measure the real Power with an external, reliable power meter and enter this Power via this command to calibrate. The calibration is automatically saved in the flash memory. | File: driver/drv_pwrCal.c<br/>Function: NULL); |
-| VREF | Value |  | File: driver/drv_pwrCal.c<br/>Function: NULL); |
-| IREF | Value |  | File: driver/drv_pwrCal.c<br/>Function: NULL); |
-| PREF | Value |  | File: driver/drv_pwrCal.c<br/>Function: NULL); |
+| SGP_cycle | [int] | change cycle of measurement by default every 10 seconds 0 to deactivate<br/>e.g.:SGP_Cycle 60 | File: drv/drv_sgp.c<br/>Function: SGP_cycle |
+| SGP_GetVersion |  | SGP : get version<br/>e.g.:SGP_GetVersion | File: drv/drv_sgp.c<br/>Function: SGP_GetVersion |
+| SGP_GetBaseline |  | SGP Get baseline<br/>e.g.:SGP_GetBaseline | File: drv/drv_sgp.c<br/>Function: SGP_GetBaseline |
+| SGP_SoftReset |  | SGP i2C soft reset<br/>e.g.:SGP_SoftReset | File: drv/drv_sgp.c<br/>Function: SGP_SoftReset |
 | SHT_cycle | [int] | change cycle of measurement by default every 10 seconds 0 to deactivate<br/>e.g.:SHT_Cycle 60 | File: drv/drv_sht3x.c<br/>Function: SHT_cycle |
 | SHT_Calibrate |  | Calibrate the SHT Sensor as Tolerance is +/-2 degrees C.<br/>e.g.:SHT_Calibrate -4 10 | File: driver/drv_sht3x.c<br/>Function: SHT3X_Calibrate |
 | SHT_MeasurePer |  | Retrieve Periodical measurement for SHT<br/>e.g.:SHT_Measure | File: driver/drv_sht3x.c<br/>Function: SHT3X_MeasurePer |
@@ -178,11 +188,13 @@ Do not add anything here, as it will overwritten with next rebuild.
 | DGR_SendRGBCW | [GroupName][HexRGBCW] | Sends a RGBCW message to given Tasmota Device Group with no reliability. Requires no prior setup and can control any group, but won't retransmit. You can use this command in two ways, first is like DGR_SendRGBCW GroupName 255 255 0, etc, second is DGR_SendRGBCW GroupName FF00FF00 etc etc. | File: driver/drv_tasmotaDeviceGroups.c<br/>Function: CMD_DGR_SendRGBCW |
 | DGR_SendFixedColor | [GroupName][TasColorIndex] | Sends a FixedColor message to given Tasmota Device Group with no reliability. Requires no prior setup and can control any group, but won't retransmit. | File: driver/drv_tasmotaDeviceGroups.c<br/>Function: CMD_DGR_SendFixedColor |
 | SetupTestPower |  | NULL | File: driver/drv_test_drivers.c<br/>Function: TestPower_Setup |
-| TM1637_Clear | CMD_TM1637_Clear |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
-| TM1637_Print | CMD_TM1637_Print |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
-| TM1637_Test | CMD_TM1637_Test |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
-| TM1637_Brightness | CMD_TM1637_Brightness |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
-| TM1637_Map | CMD_TM1637_Map |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
+| TMGN_SetBit | [CharIndex] [BitIndex] [BitValue] | Set given bit of given digit to 1 or 0. | File: driver/drv_tm1637.c<br/>Function: NULL); |
+| TMGN_Clear |  | This clears the TM1637/GN932/etc display | File: driver/drv_tm_gn_display_shared.c<br/>Function: NULL); |
+| TMGN_Char | [CharIndex] [CharCode] | This allows you to set binary code for given char, valid chars range is 0 to 15, because this is 7-seg display | File: driver/drv_tm1637.c<br/>Function: NULL); |
+| TMGN_Print | [StartOfs] [MaxLenOr0] [StringText] [optionalBClampWithZeroesForClock] | This allows you to print string on TM1637/GN932/etc display, it supports variables expansion | File: driver/drv_tm_gn_display_shared.c<br/>Function: NULL); |
+| TMGN_Test | CMD_TM1637_Test |  | File: driver/drv_tm_gn_display_shared.c<br/>Function: NULL); |
+| TMGN_Brightness | [Brigthness0to7][bOn] | This allows you to change brightness and state of  TM1637/GN932/etc display | File: driver/drv_tm_gn_display_shared.c<br/>Function: NULL); |
+| TMGN_Map | [Map0][Map1, etc] | This allows you to remap characters order for TM1637/GN932/etc. My TM1637 module from Aliexpress has a strange characters order. | File: driver/drv_tm_gn_display_shared.c<br/>Function: NULL); |
 | TM1650_Test | CMD_TM1650_Test |  | File: driver/drv_tm1637.c<br/>Function: NULL); |
 | tuyaMcu_testSendTime |  | Sends a example date by TuyaMCU to clock/callendar MCU | File: driver/drv_tuyaMCU.c<br/>Function: TuyaMCU_Send_SetTime_Example |
 | tuyaMcu_sendCurTime |  | Sends a current date by TuyaMCU to clock/callendar MCU. Time is taken from NTP driver, so NTP also should be already running. | File: driver/drv_tuyaMCU.c<br/>Function: TuyaMCU_Send_SetTime_Current |

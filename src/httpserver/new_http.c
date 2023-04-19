@@ -448,6 +448,11 @@ const char* htmlPinRoleNames[] = {
 	"TM1637_DIO",
 	"TM1637_CLK",
 	"BL0937SEL_n",
+  "DoorSnsrWSleep_pd",
+	"SGP_CLK",
+	"SGP_DAT",
+	"ADC_Button",
+	"error",
 	"error",
 	"error",
 	"error",
@@ -704,6 +709,7 @@ int HTTP_ProcessPacket(http_request_t* request) {
 	if (http_checkUrlBase(urlStr, "about")) return http_fn_about(request);
 
 	if (http_checkUrlBase(urlStr, "cfg_mqtt")) return http_fn_cfg_mqtt(request);
+	if (http_checkUrlBase(urlStr, "cfg_ip")) return http_fn_cfg_ip(request);
 	if (http_checkUrlBase(urlStr, "cfg_mqtt_set")) return http_fn_cfg_mqtt_set(request);
 
 	if (http_checkUrlBase(urlStr, "cfg_webapp")) return http_fn_cfg_webapp(request);

@@ -397,7 +397,6 @@ bool Main_HasFastConnect();
 void Main_OnEverySecond();
 int Main_HasMQTTConnected();
 int Main_HasWiFiConnected();
-int Main_GetLastRebootBootFailures();
 void Main_OnPingCheckerReply(int ms);
 
 // new_ping.c
@@ -433,6 +432,8 @@ typedef enum
     EXCELLENT,
 } WIFI_RSSI_LEVEL;
 
+#define IP_STRING_FORMAT	"%hhu.%hhu.%hhu.%hhu"
+
 WIFI_RSSI_LEVEL wifi_rssi_scale(int8_t rssi_value);
 extern const char *str_rssi[];
 extern int bSafeMode;
@@ -440,12 +441,14 @@ extern int g_bWantPinDeepSleep;
 extern int g_timeSinceLastPingReply;
 extern int g_startPingWatchDogAfter;
 extern int g_openAP;
+extern int g_bootFailures;
 
 typedef int(*jsonCb_t)(void *userData, const char *fmt, ...);
 int JSON_ProcessCommandReply(const char *cmd, const char *args, void *request, jsonCb_t printer, int flags);
 void ScheduleDriverStart(const char *name, int delay);
 bool isWhiteSpace(char ch);
-
+void convert_IP_to_string(char *o, unsigned char *ip);
+int str_to_ip(const char *s, byte *ip);
 
 #endif /* __NEW_COMMON_H__ */
 
